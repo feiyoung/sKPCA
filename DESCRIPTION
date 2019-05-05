@@ -1,7 +1,7 @@
 Package: sKPCA
 Type: Package
 Title: Sketched Kernel PCA
-Version: 0.1.1
+Version: 0.1.2
 Author: Wei Liu
 Maintainer: Wei Liu <weiliu@smail.swufe.edu.cn>
 Description: Trading off Statistical Accuracy and Computational
@@ -9,9 +9,9 @@ Description: Trading off Statistical Accuracy and Computational
 License: GPL
 Encoding: UTF-8
 LazyData: true
-Date: 2019-05-03
+Date: 2019-05-05
 NeedsCompilation: no
 Depends: kernlab, Matrix, MASS, R (>= 3.0.1)
 Imports: MASS, graphics
 Suggests: stats
-Packaged: 2019-05-05 01:11:47 UTC; LiuWei
+Packaged: 2019-05-05 06:48:48 UTC; LiuWei

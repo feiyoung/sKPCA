@@ -11,7 +11,7 @@
   \item{X}{a n*p matrix, the data matrix.}
 }
 \details{
-   sigma = \sqrt{\frac{1}{n^2}\sumi\sumj\|X_i -X_j\|_2^2}
+   sigma = sqrt(frac(1)(n^2)sumisumj |X_i -X_j|_2^2)
 }
 \value{
   return a positive scalar.
