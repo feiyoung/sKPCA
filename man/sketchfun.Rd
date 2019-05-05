@@ -1,0 +1,38 @@
+\name{sketchfun}
+\alias{sketchfun}
+\title{Generate sketch matrix}
+\description{
+  Generate three types of sketch matrix
+}
+\usage{
+  sketchfun(m, n, type='ROS')
+}
+\arguments{
+  \item{m}{a positive integer,  the user-specified projection dimension.}
+  \item{n}{a positive integer, the sample size.}
+  \item{type}{a character, specify the type of of sketch matrix and include
+    'subGaussian', 'ROS' and 'subSampling', default as ROS.}
+}
+\details{
+  The argument type specify the type of of sketch matrix, where 'subGaussian' is Sub-Gaussian sketch, 'ROS' is Randomized Orthogonal System (ROS) sketch matrix, and 'subSampling' is  Sub-sampling sketch matrix.
+}
+\value{
+  return a m*n sketch matrix.
+}
+\references{
+  nothing.
+}
+\author{
+  Liu Wei
+}
+\note{
+  nothing
+}
+\seealso{
+  nothing
+}
+\examples{
+  sketchfun(5,100)
+  sketchfun(10, 50, type='subGaussian')
+}
+\keyword{sketch matrix}

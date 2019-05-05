@@ -1,0 +1,2 @@
+#exportPattern("^[[:alpha:]]+")
+export(sKPCA,sketchfun, recerrfun, sigmaslect, oKPCA)
