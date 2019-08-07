@@ -16,36 +16,80 @@
 ##------self-defined function-----------------------
 
 #-- generate sketch matrix
-sketchfun <- function(m, n, type='ROS'){
+sketchfun <- function(m, n, type){
   library(Matrix)
+
   Praw <- Diagonal(n, x = 1)
   ind <- sample(n, m)
   R <- Diagonal(n, 1/2 - rbinom(n, 1, 0.5))
-  H <- Praw
+
+  set.seed(1)
+  H <-  Praw[sample(n,n),]
+
   S <- switch(type,
               subGaussian = matrix(rnorm(n*m),m,n),
               ROS = sqrt(n/m)*Praw[ind,]%*% H %*% R,
               subSampling = sqrt(n/m)*Praw[ind,])
-  return(as.matrix(S))
-}
-#-- assist to evaluate reconstruction error
-recerr= function(x,data,alpha,alphaKrow,sumalpha,Ksum ,kern){
-  # x <- tsdata
-  # data <- trdata
-  ns <- nrow(x)
-  d <- length(sumalpha)
-  if(!inherits(x,'matrix')) x <- as.matrix(x)
-  if(!inherits(data,'matrix')) data <- as.matrix(data)
-  kmat = kernelMatrix(kern, data,x)
-  f <- t(kmat) %*% (alpha) - matrix(apply(kmat, 2,mean)- Ksum, ncol=1)%*% t(sumalpha) -
-    matrix(alphaKrow, nrow=ns, ncol=d, byrow=T)
-  f <- as.matrix(f)
-  res <- diag(kernelMatrix(kern, x,x)) - 2*apply(kmat, 2, mean) + Ksum - apply(f*Conj(f),1, sum)
-  return(as.vector(res))
+  return(S)
 }
 
-#-- main function to conduct sketched KPCA.
-sKPCA <- function(trdata, tsdata=NULL,d, m=ceiling(sqrt(nrow(trdata))), Stype='ROS',  kern=rbfdot(sigma=0.5), seed=2){
+
+#-- main function to conduct fast random KPCA.
+sKPCA_nc <- function(trdata, d, m=max(d+1,ceiling(sqrt(nrow(trdata))) ), Stype='subGaussian',  kern=rbfdot(sigma=0.5), seed=2){
+  # # nc indicates non-centeralized
+  require(kernlab)
+  n <- nrow(trdata)
+  K <- kernelMatrix(kern, as.matrix(trdata))
+  set.seed(seed) # reproducible
+  S <- sketchfun(m,n, Stype)
+  Kt <- S %*% K %*% t(S)
+  eigv <- eigen(Kt, symmetric = T)
+  alpha_tilde <- eigv$vectors[,1:d]%*% diag(1/sqrt(eigv$values[1:d]))
+  alpha <- t(S) %*% alpha_tilde
+  # norm(cbind(alpha[,1]),'f')
+  alpha_rotate <- K %*% alpha # rotation for principal component scores.
+
+  res <- list()
+  res$alpha <- alpha
+  res$Kia <- qr.solve(t(alpha)%*% alpha_rotate )
+  res$kern <- kern
+  res$data <- trdata
+  res$alpha_rotate <- alpha_rotate
+  res$prop_var <- sum(eigv$values[1:d]) / sum(eigv$values)
+  class(res) <- c('sKPCA', 'sKPCA_nc')
+  return(res)
+}
+
+sKPCA_nc2 <- function(trdata,d, m=max(d+1,ceiling(sqrt(nrow(trdata))) ), Stype='subGaussian',  kern=rbfdot(sigma=0.5), seed=2){
+  # # nc indicates non-centeralized
+  require(kernlab)
+  n <- nrow(trdata)
+  K <- kernelMatrix(kern, as.matrix(trdata))
+  set.seed(seed) # reproducible
+  S <- sketchfun(m,n, Stype)
+  SK <- S %*% K
+  SKS <- SK%*%t(S)
+
+  svdSKS <- svd(SKS)
+  Z <- t(SK)%*% svdSKS$u %*% diag(1/sqrt(svdSKS$d))
+
+  svdz <- svd(Z)
+  alpha <- svdz$u[,1:d]
+  # alpha[1:10,]
+  alpha_rotate <- K %*% alpha # rotation for principal component scores.
+  res <- list()
+  res$alpha <- alpha
+  res$alpha_rotate <- alpha_rotate
+  res$Kia <- qr.solve(t(alpha)%*% alpha_rotate )
+  res$kern <- kern
+  res$data <- trdata
+  res$prop_var <- sum(svdz$d[1:d]) / sum(svdz$d)
+  class(res) <- c('sKPCA', 'sKPCA_nc')
+  return(res)
+}
+
+#-- main function to conduct fast random centralized KPCA.
+sKPCA_c <- function(trdata, d, m=max(d+1,ceiling(sqrt(nrow(trdata))) ), Stype='subGaussian',  kern=rbfdot(sigma=0.5), seed=2){
   require(kernlab)
   n <- nrow(trdata)
   K <- kernelMatrix(kern, as.matrix(trdata))
@@ -54,8 +98,7 @@ sKPCA <- function(trdata, tsdata=NULL,d, m=ceiling(sqrt(nrow(trdata))), Stype='R
   K <- K - matrix(Krow, n,n, byrow=T) - matrix(Krow, n, n) + Ksum
   set.seed(seed) # reproducible
   S <- sketchfun(m,n, Stype)
-  Kt <- S%*%K%*%t(S)
-
+  Kt <- S %*% K %*% t(S) /n
   eigv <- eigen(Kt, symmetric = T)
   alpha_tilde <- eigv$vectors[,1:d]%*% diag(1/sqrt(eigv$values[1:d]))
   alpha <- t(S) %*% alpha_tilde
@@ -64,29 +107,115 @@ sKPCA <- function(trdata, tsdata=NULL,d, m=ceiling(sqrt(nrow(trdata))), Stype='R
   res <- list()
   res$alpha <- alpha
   res$alpha_rotate <- alpha_rotate
-  sumalpha <- apply(alpha, 2, sum)
-  alphaKrow <- Krow %*% alpha
-  if(is.null(tsdata)){
-    err <- recerr(trdata,trdata,alpha,alphaKrow,sumalpha,Ksum,kern)
-  }else{
-    err <- recerr(tsdata,trdata,alpha,alphaKrow,sumalpha,Ksum,kern)
-  }
-  res$rec_err <- err
+
   res$prop_var <- sum(eigv$values[1:d]) / sum(eigv$values)
-  class(res) <- 'sKPCA'
+  res$Ktia <- qr.solve(t(alpha)%*%K%*%alpha)
+  res$Krow <- Krow
+  res$Ksum <- Ksum
+  res$kern <- kern
+  res$data <- trdata
+
+  class(res) <- c('sKPCA', 'sKPCA_c')
+  return(res)
+}
+
+sKPCA_c2 <- function(trdata, d, m=max(d+1,ceiling(sqrt(nrow(trdata))) ), Stype='subGaussian',  kern=rbfdot(sigma=0.5), seed=2){
+  require(kernlab)
+  n <- nrow(trdata)
+  K <- kernelMatrix(kern, as.matrix(trdata))
+  Krow <- apply(K,2, mean)
+  Ksum <- mean(Krow)
+  K <- K - matrix(Krow, n,n, byrow=T) - matrix(Krow, n, n) + Ksum
+  set.seed(seed) # reproducible
+  S <- sketchfun(m,n, Stype)
+  S <- sketchfun(m,n, Stype)
+  SK <- S %*% K/n
+  SKS <- SK%*%t(S)
+
+  svdSKS <- svd(SKS)
+  Z <- t(SK)%*% svdSKS$u %*% diag(1/sqrt(svdSKS$d))
+
+  svdz <- svd(Z)
+  alpha <- svdz$u[,1:d] %*% diag(1/svdz$d[1:d])
+  # alpha[1:10,]
+  alpha_rotate <- K %*% alpha # rotation for principal component scores.
+  res <- list()
+  res$alpha <- alpha
+  res$alpha_rotate <- alpha_rotate
+
+  res$Ktia <- qr.solve(t(alpha)%*%K%*%alpha)
+  res$Krow <- Krow
+  res$Ksum <- Ksum
+  res$kern <- kern
+  res$data <- trdata
+  res$prop_var <- sum(svdz$d[1:d]) / sum(svdz$d)
+  class(res) <- c('sKPCA', 'sKPCA_c')
+  return(res)
+}
+
+sKPCA <- function(trdata,d, m=max(d+1,ceiling(sqrt(nrow(trdata))) ), Stype='subGaussian',  kern=rbfdot(sigma=0.5), seed=2, fast_version=0, center=T){
+   if(center){
+     if(fast_version){
+       res <- sKPCA_c(trdata, d, m, Stype,  kern, seed)
+     }else{
+       res <- sKPCA_c2(trdata, d, m, Stype,  kern, seed)
+     }
+     res$center <- TRUE
+   }else{
+     if(fast_version){
+       res <- sKPCA_nc(trdata, d, m, Stype,  kern, seed)
+     }else{
+       res <- sKPCA_nc2(trdata, d, m, Stype,  kern, seed)
+     }
+     res$center <- FALSE
+   }
+
   return(res)
 }
 
 
 # original KPCA
-oKPCA <- function(trdata, tsdata=NULL,d, kern=rbfdot(sigma=0.5)){
+oKPCA <- function(trdata, d, kern=rbfdot(sigma=0.5), center=TRUE){
+  if(center){
+    res <- oKPCA_c(trdata, d, kern=kern)
+    res$center <- TRUE
+  }else{
+    res <- oKPCA_nc(trdata, d, kern=kern)
+    res$center <- FALSE
+  }
+  return(res)
+}
+# original KPCA
+oKPCA_nc <- function(trdata, d, kern=rbfdot(sigma=0.5)){
+  require(kernlab)
+  n <- nrow(trdata)
+  K <- kernelMatrix(kern, as.matrix(trdata))
+
+  eigv <- eigen(K, symmetric = T)
+  alpha <- eigv$vectors[,1:d]
+
+  # alpha[1:10,]
+  alpha_rotate <- K %*% alpha # rotation for principal component scores.
+  res <- list()
+  res$alpha <- alpha
+  res$alpha_rotate <- alpha_rotate
+  res$Kia <- qr.solve(t(alpha)%*%K%*%alpha)
+  res$data <- trdata
+  res$kern <- kern
+  res$prop_var <- sum(eigv$values[1:d]) / sum(eigv$values)
+  class(res) <- 'oKPCA'
+  return(res)
+}
+
+# original KPCA
+oKPCA_c <- function(trdata, d, kern=rbfdot(sigma=0.5)){
   require(kernlab)
   n <- nrow(trdata)
   K <- kernelMatrix(kern, as.matrix(trdata))
   Krow <- apply(K,2, mean)
   Ksum <- mean(Krow)
   Kt <- K - matrix(Krow, n,n, byrow=T) - matrix(Krow, n, n) + Ksum
-  eigv <- eigen(Kt, symmetric = T)
+  eigv <- eigen(Kt/n, symmetric = T)
   alpha <- eigv$vectors[,1:d]
   alpha <- alpha %*% diag(1/sqrt(eigv$values[1:d]))
 
@@ -94,26 +223,71 @@ oKPCA <- function(trdata, tsdata=NULL,d, kern=rbfdot(sigma=0.5)){
   res <- list()
   res$alpha <- alpha
   res$alpha_rotate <- alpha_rotate
-  sumalpha <- apply(alpha, 2, sum)
-  alphaKrow <- Krow %*% alpha
-  if(is.null(tsdata)){
-    err <- recerr(trdata,trdata,alpha,alphaKrow,sumalpha,Ksum,kern)
-  }else{
-    err <- recerr(tsdata,trdata,alpha,alphaKrow,sumalpha,Ksum,kern)
-  }
-  res$rec_err <- err
+
+  res$Ktia <- qr.solve(t(alpha)%*%K%*%alpha)
+  res$Krow <- Krow
+  res$Ksum <- Ksum
+  res$kern <- kern
+  res$data <- trdata
   res$prop_var <- sum(eigv$values[1:d]) / sum(eigv$values)
   class(res) <- 'oKPCA'
   return(res)
 }
 
-#-- evaluate reconstruction error from fKPCA or oKPCA class.
-recerrfun <- function(obj){
+rec_predict <- function(obj, newdata=NULL){
   if((!inherits(obj, 'sKPCA')) && (!inherits(obj, 'oKPCA')))
     stop('obj must be sKPCA or oKPCA class!')
-  recerr <- obj$rec_err
-  return(mean(recerr^2))
+  if(obj$center){
+    re <- recerr_c(tsdata,obj$data,obj$alpha, obj$Ktia, obj$Krow, obj$Ksum,obj$kern)
+    attr(re, 'class') <- 'centralized'
+  }else{
+    re <- recerr_nc(tsdata,obj$data,obj$alpha, obj$Kia, obj$kern)
+    attr(re, 'class') <- 'noncentralized'
+  }
+return(re)
 }
+
+recerr_c <- function(x,data,alpha, Ktia, Krow, Ksum, kern){ # nc indicates non-centeralized
+  # x <- tsdata; data <- obj$data; alpha <- obj$alpha; Ktia <- obj$Ktia; kern <- obj$kern
+
+  if(!inherits(x,'matrix')) x <- as.matrix(x)
+  if(!inherits(data,'matrix')) data <- as.matrix(data)
+  kmat <- kernelMatrix(kern, data,x)
+  nr <- nrow(kmat); nc <- ncol(kmat)
+  Ktzz <- diag(kernelMatrix(kern, x,x)) - 2*apply(kmat, 2, mean) + Ksum
+  Ktz <- kmat - matrix(Krow, nr, nc) - matrix(apply(kmat, 2, mean), nr, nc, byrow=T) + Ksum
+
+  res <-  Ktzz - diag(t(Ktz)%*%alpha %*% Ktia %*%t(alpha)%*% Ktz)
+  return(as.vector(res))
+}
+
+rec_predict_c<- function(obj, tsdata){
+  if((!inherits(obj, 'sKPCA')) && (!inherits(obj, 'oKPCA')))
+    stop('obj must be sKPCA or oKPCA class!')
+  re <- recerr_c(tsdata,obj$data,obj$alpha, obj$Ktia, obj$Krow, obj$Ksum,obj$kern)
+  return(re)
+}
+
+
+rec_predict_nc <- function(obj, tsdata){
+  if((!inherits(obj, 'sKPCA')) && (!inherits(obj, 'oKPCA')))
+    stop('obj must be sKPCA or oKPCA class!')
+  re <- recerr_nc(tsdata,obj$data,obj$alpha, obj$Kia, obj$kern)
+  return(re)
+}
+#-- assist to evaluate reconstruction error
+recerr_nc <- function(x,data,alpha, Kia, kern){ # nc indicates non-centeralized
+  # x <- tsdata
+  # data <- trdata
+
+  if(!inherits(x,'matrix')) x <- as.matrix(x)
+  if(!inherits(data,'matrix')) data <- as.matrix(data)
+  kmat <- kernelMatrix(kern, data,x)
+  f2 <- t(kmat)%*%alpha%*%Kia%*%t(alpha)%*%kmat
+  res <- diag(kernelMatrix(kern, x,x)) - diag(f2)
+  return(as.vector(res))
+}
+
 
 #--
 vec2difmat <- function(x){
@@ -121,7 +295,7 @@ vec2difmat <- function(x){
   matrix(x, nrow=nx, ncol=nx) - matrix(x, nrow=nx, ncol=nx, byrow=T)
 }
 
-sigmaslect <- function(X){
+sigmaselect <- function(X){
   p <- ncol(X)
   n <- nrow(X)
   res <- array(0, c(n,n, p))

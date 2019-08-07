@@ -1,0 +1,54 @@
+\name{rec_predict}
+\alias{rec_predict}
+\title{Evaluate the empirical reconstruction error for new data}
+\description{
+  Evaluate the reconstruction error based on object with 'sKPCA' class or 'oKPCA' class.
+}
+\usage{
+  rec_predict(obj, tsdata)
+}
+\arguments{
+  \item{obj}{an object with 'sKPCA' class or 'oKPCA' class.}
+  \item{tsdata}{a matrix of newdata to be evaluted for reconstruction error (RE). If it is NULL, then the RE of training data is evaluated, default as NULL.}
+}
+\value{
+  return a numeric vector whose length is equal to the row of tsdata.
+}
+\references{
+  nothing.
+}
+\author{
+  Liu Wei
+}
+\note{
+  nothing
+}
+\seealso{
+  nothing
+}
+\examples{
+  library(kernlab)
+  data(iris)
+  set.seed(1)
+  test <- sample(1:150,20)
+  trdata <- iris[-test,-5]
+  tsdata <- iris[test, -5]
+  n <- nrow(trdata)
+  kern <- rbfdot(sigma = 1e-2)
+  ## evaluate reconstruction error for sKPCA and oKPCA
+  ## centralized sKPCA
+  skc <- sKPCA(trdata, d=2, m=30, kern =kern)
+  rec_predict(skc, tsdata)
+
+  ## centralized oKPCA
+  okc <- oKPCA(trdata, d=2, kern=kern)
+  rec_predict(okc, tsdata)
+
+  ## non-centralized sKPCA
+  sknc <- sKPCA(trdata, d=2, m=30, kern =kern, center=F)
+  rec_predict(sknc, tsdata)
+  ## non-centralized oKPCA
+  oknc <- oKPCA(trdata, d=2, kern=kern, center=F)
+  rec_predict(oknc, tsdata)
+}
+\keyword{Reconstruction error}
