@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1565151938840.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3521213554",
+    "id" : "BEF6470F",
+    "lastKnownWriteTime" : 1565152312,
+    "last_content_update" : -2147483648,
+    "path" : "~/sKPCA/man/sigmaselect.Rd",
+    "project_path" : "man/sigmaselect.Rd",
+    "properties" : {
+        "cursorPosition" : "9,8",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_doc"
+}

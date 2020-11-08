@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1556936561051.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1008806874",
+    "id" : "DA38D3F7",
+    "lastKnownWriteTime" : 1565152813,
+    "last_content_update" : -2147483648,
+    "path" : "~/sKPCA/man/sKPCA.Rd",
+    "project_path" : "man/sKPCA.Rd",
+    "properties" : {
+        "cursorPosition" : "87,17",
+        "scrollLine" : "64"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_doc"
+}

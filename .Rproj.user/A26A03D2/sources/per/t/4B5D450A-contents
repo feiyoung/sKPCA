@@ -1,0 +1,20 @@
+Package: sKPCA
+Type: Package
+Title: Sketched Kernel PCA
+Version: 0.1.2
+Author: Wei Liu
+Maintainer: Wei Liu <weiliu@smail.swufe.edu.cn>
+Description:Trading off Statistical Accuracy and Computational
+    Efficiency by Randomized Sketched Kernel PCA 
+License: GPL
+Encoding: UTF-8
+LazyData: true
+Date: 2019-05-05
+NeedsCompilation: no
+Depends:
+    kernlab,
+    Matrix,
+    MASS,
+    R (>= 3.0.1)
+Imports: MASS, graphics
+Suggests: stats
